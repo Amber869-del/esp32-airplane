@@ -2,160 +2,194 @@
 <html lang="zh-TW">
 <head>
   <meta charset="UTF-8">
-  <title>中華航空波音 737 姿態與跌倒防護即時監控</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>中華航空 B777-300ER 飛態即時監控</title>
   <style>
-    * { box-sizing: border-box; }
     body {
       margin: 0;
       padding: 0;
-      width: 100vw;
-      height: 100vh;
       overflow: hidden;
-      background: radial-gradient(circle at center, #1e293b 0%, #0f172a 100%);
-      font-family: system-ui, -apple-system, sans-serif;
-      color: white;
+      background-color: #0b132b;
+      font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+      color: #ffffff;
     }
-
-    /* 左上角儀表板 */
-    #ui {
+    #info-box {
       position: absolute;
       top: 20px;
       left: 20px;
-      z-index: 10;
-      background: rgba(15, 23, 42, 0.85);
-      backdrop-filter: blur(8px);
-      padding: 20px;
+      background: rgba(10, 25, 47, 0.85);
+      border: 1px solid #1c2541;
       border-radius: 12px;
-      border: 1px solid #334155;
-      min-width: 240px;
-      box-shadow: 0 10px 25px rgba(0,0,0,0.5);
+      padding: 20px;
+      box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.37);
+      backdrop-filter: blur(8px);
+      z-index: 10;
+      min-width: 220px;
     }
-    h2 { margin: 0 0 10px 0; font-size: 18px; color: #38bdf8; }
-    p { margin: 6px 0; font-size: 15px; }
-
-    /* 跌倒緊急警報橫幅 */
-    #alertBanner {
-      display: none;
-      position: absolute;
-      top: 0; left: 0; right: 0;
-      z-index: 100;
-      background: #dc2626;
-      color: white;
-      text-align: center;
-      font-size: 24px;
+    h2 {
+      margin: 0 0 10px 0;
+      font-size: 1.1rem;
+      color: #64ffda;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+    .data-row {
+      margin: 8px 0;
+      font-size: 0.95rem;
+    }
+    .status-online {
+      color: #00ff88;
       font-weight: bold;
-      padding: 15px 0;
-      box-shadow: 0 4px 15px rgba(220, 38, 38, 0.6);
-      animation: flash 0.6s infinite alternate;
     }
-
-    @keyframes flash {
-      from { background-color: #dc2626; }
-      to { background-color: #7f1d1d; }
-    }
-
-    /* 飛機舞台區域 */
-    #stage {
-      width: 100%;
-      height: 100%;
-      display: flex;
-      justify-content: center;
-      align-items: center;
-      perspective: 1200px; /* 強化 3D 視角景深 */
-    }
-
-    /* 飛機容器與 3D 姿勢轉換 */
-    #planeWrapper {
-      width: 500px;
-      height: 500px;
-      display: flex;
-      justify-content: center;
-      align-items: center;
-      /* CSS 硬體加速，讓擺動非常平滑流暢 */
-      transition: transform 0.1s cubic-bezier(0.1, 0.7, 0.1, 1);
-      will-change: transform;
-    }
-
-    /* 中華航空波音 737 圖案與陰影 */
-    .plane-img {
-      width: 100%;
-      height: 100%;
-      object-fit: contain;
-      filter: drop-shadow(0 20px 30px rgba(0,0,0,0.7));
+    .status-offline {
+      color: #ff4d4d;
+      font-weight: bold;
     }
   </style>
+  <!-- 引入 Three.js 3D 引擎 -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
 </head>
 <body>
 
-  <div id="alertBanner">🚨 警告：偵測到長者意外跌倒！請立刻確認狀況！</div>
-
-  <div id="ui">
-    <h2>✈️ 華航 B737 姿態監控</h2>
-    <p>俯仰角 (Pitch): <span id="pitchVal">0</span>°</p>
-    <p>翻滾角 (Roll): <span id="rollVal">0</span>°</p>
-    <hr style="border-color: #334155; margin: 10px 0;">
-    <p>安全狀態: <span id="statusVal" style="color: #4ade80; font-weight: bold;">正常活動中</span></p>
-    <p>最近撞擊 G 力: <span id="gVal">0.0</span> G</p>
-  </div>
-
-  <div id="stage">
-    <div id="planeWrapper">
-      <!-- 採用類似你圖片樣式的華航 Boeing 737 去背高畫質圖案 -->
-      <img class="plane-img" src="https://upload.wikimedia.org/wikipedia/commons/f/f7/China_Airlines_Boeing_737-800_B-18606.png" alt="中華航空波音 737" onerror="this.src='data:image/svg+xml;utf8,<svg xmlns=\'http://www.w3.org/2000/svg\' viewBox=\'0 0 512 512\'><path fill=\'%2338bdf8\' d=\'M256 16L208 176L32 240L32 288L208 240L208 400L160 448L160 496L256 464L352 496L352 448L304 400L304 240L480 288L480 240L304 176Z\'/></svg>'">
-    </div>
+  <div id="info-box">
+    <h2>✈️ 華航 B777 姿態監控</h2>
+    <div class="data-row">俯仰角 (Pitch): <span id="pitch-val">0.0</span>°</div>
+    <div class="data-row">翻滾角 (Roll): <span id="roll-val">0.0</span>°</div>
+    <hr style="border: 0.5px solid #1c2541; margin: 12px 0;">
+    <div class="data-row">連線狀態: <span id="status" class="status-offline">離線中...</span></div>
   </div>
 
   <script>
-    const planeWrapper = document.getElementById('planeWrapper');
-    const planeUrl = "https://esp32-plane-f7328-default-rtdb.firebaseio.com/plane.json";
-    const fallUrl  = "https://esp32-plane-f7328-default-rtdb.firebaseio.com/fall_alert.json";
+    // 1. 初始化 Three.js 場景
+    const scene = new THREE.Scene();
+    scene.background = new THREE.Color(0x0a1128);
 
-    // 讀取 3D 姿態角度並即時旋轉圖片
-    async function fetchPlane() {
-      try {
-        const res = await fetch(planeUrl);
-        const data = await res.json();
-        if (data) {
-          const pitch = parseFloat(data.pitch) || 0;
-          const roll  = parseFloat(data.roll) || 0;
+    const camera = new THREE.PerspectiveCamera(45, window.innerWidth / window.innerHeight, 0.1, 1000);
+    camera.position.set(0, 5, 25);
+    camera.lookAt(0, 0, 0);
 
-          document.getElementById('pitchVal').innerText = pitch.toFixed(1);
-          document.getElementById('rollVal').innerText = roll.toFixed(1);
+    const renderer = new THREE.WebGLRenderer({ antialias: true });
+    renderer.setSize(window.innerWidth, window.innerHeight);
+    renderer.shadowMap.enabled = true;
+    document.body.appendChild(renderer.domElement);
 
-          // 結合 Pitch (俯仰) 與 Roll (左右傾斜) 的 3D 立體效果
-          planeWrapper.style.transform = `rotateZ(${-roll}deg) rotateX(${pitch}deg)`;
-        }
-      } catch (err) { console.error(err); }
-    }
+    // 光源設定
+    const ambientLight = new THREE.AmbientLight(0xffffff, 0.7);
+    scene.add(ambientLight);
 
-    // 讀取跌倒警報
-    async function fetchFallAlert() {
-      try {
-        const res = await fetch(fallUrl);
-        const data = await res.json();
-        if (data) {
-          const banner = document.getElementById('alertBanner');
-          const statusText = document.getElementById('statusVal');
-          const gText = document.getElementById('gVal');
+    const dirLight = new THREE.DirectionalLight(0xffffff, 0.8);
+    dirLight.position.set(10, 20, 15);
+    scene.add(dirLight);
 
-          if (data.impactG) gText.innerText = data.impactG;
+    // 2. 建立華航 Boeing 777 3D 模型
+    const airplane = new THREE.Group();
 
-          if (data.isFallen) {
-            banner.style.display = 'block';
-            statusText.innerText = '🚨 意外跌倒中！';
-            statusText.style.color = '#ef4444';
-          } else {
-            banner.style.display = 'none';
-            statusText.innerText = '正常活動中';
-            statusText.style.color = '#4ade80';
+    // 機身 (Fuselage) - 華航白
+    const bodyGeo = new THREE.CylinderGeometry(0.9, 0.8, 14, 32);
+    const bodyMat = new THREE.MeshStandardMaterial({ color: 0xf8f9fa, roughness: 0.3 });
+    const fuselage = new THREE.Mesh(bodyGeo, bodyMat);
+    fuselage.rotation.x = Math.PI / 2;
+    airplane.add(fuselage);
+
+    // 機鼻 (Nose)
+    const noseGeo = new THREE.ConeGeometry(0.9, 2.5, 32);
+    const noseMat = new THREE.MeshStandardMaterial({ color: 0x1c2541 });
+    const nose = new THREE.Mesh(noseGeo, noseMat);
+    nose.rotation.x = -Math.PI / 2;
+    nose.position.z = 8.25;
+    airplane.add(nose);
+
+    // 主翼 (Main Wings) - 雙發動機長程長翼
+    const wingGeo = new THREE.BoxGeometry(18, 0.1, 2.5);
+    const wingMat = new THREE.MeshStandardMaterial({ color: 0xd1d5db });
+    const wings = new THREE.Mesh(wingGeo, wingMat);
+    wings.position.set(0, 0, 1);
+    airplane.add(wings);
+
+    // 發動機 (B777 巨型 GE90 引擎 x2)
+    const engineGeo = new THREE.CylinderGeometry(0.55, 0.55, 2.2, 16);
+    const engineMat = new THREE.MeshStandardMaterial({ color: 0x4b5563, metalness: 0.8 });
+    
+    const leftEngine = new THREE.Mesh(engineGeo, engineMat);
+    leftEngine.rotation.x = Math.PI / 2;
+    leftEngine.position.set(-3.5, -0.6, 1);
+    airplane.add(leftEngine);
+
+    const rightEngine = new THREE.Mesh(engineGeo, engineMat);
+    rightEngine.rotation.x = Math.PI / 2;
+    rightEngine.position.set(3.5, -0.6, 1);
+    airplane.add(rightEngine);
+
+    // 垂直尾翼 (Vertical Tail) - 華航粉紅梅花意象塗裝
+    const tailGeo = new THREE.BoxGeometry(0.15, 3.2, 2.2);
+    const tailMat = new THREE.MeshStandardMaterial({ color: 0xff85a1 }); // 華航梅花粉紅色
+    const tail = new THREE.Mesh(tailGeo, tailMat);
+    tail.position.set(0, 1.8, -6.2);
+    tail.rotation.x = -Math.PI / 6;
+    airplane.add(tail);
+
+    // 水平尾翼 (Horizontal Tail)
+    const hTailGeo = new THREE.BoxGeometry(6, 0.08, 1.5);
+    const hTail = new THREE.Mesh(hTailGeo, wingMat);
+    hTail.position.set(0, 0.3, -6.5);
+    airplane.add(hTail);
+
+    scene.add(airplane);
+
+    // 3. 即時數據讀取與動畫處理
+    let lastDataTime = 0;
+    const FIREBASE_URL = "https://your-project-id-default-rtdb.firebaseio.com/airplane.json"; // 請替換成您的 Firebase 網址
+
+    function fetchData() {
+      fetch(FIREBASE_URL)
+        .then(res => res.json())
+        .then(data => {
+          if (data && data.pitch !== undefined && data.roll !== undefined) {
+            // 轉換為弧度 (Radian) 並即時旋轉 B777 模型
+            airplane.rotation.x = THREE.MathUtils.degToRad(data.pitch);
+            airplane.rotation.z = THREE.MathUtils.degToRad(-data.roll);
+
+            // 更新 UI 數據
+            document.getElementById('pitch-val').innerText = data.pitch.toFixed(1);
+            document.getElementById('roll-val').innerText = data.roll.toFixed(1);
+            
+            // 更新狀態為正常
+            const statusElem = document.getElementById('status');
+            statusElem.innerText = "正常連線中";
+            statusElem.className = "status-online";
+            
+            lastDataTime = Date.now();
           }
-        }
-      } catch (err) { console.error(err); }
+        })
+        .catch(err => console.log("等待資料中..."));
     }
 
-    // 發送頻率設為 80ms，完美解決卡頓問題
-    setInterval(fetchPlane, 80);
-    setInterval(fetchFallAlert, 150);
+    // 每 200ms 輪詢更新數據
+    setInterval(fetchData, 200);
+
+    // 4. 超時斷電判定 (超過 3 秒沒有新數據即自動切換為離線)
+    setInterval(() => {
+      if (Date.now() - lastDataTime > 3000) {
+        const statusElem = document.getElementById('status');
+        statusElem.innerText = "設備已離線 (無電源/訊號)";
+        statusElem.className = "status-offline";
+      }
+    }, 1000);
+
+    // 5. 渲染畫面的 Loop
+    function animate() {
+      requestAnimationFrame(animate);
+      renderer.render(scene, camera);
+    }
+    animate();
+
+    // 視窗大小自適應
+    window.addEventListener('resize', () => {
+      camera.aspect = window.innerWidth / window.innerHeight;
+      camera.updateProjectionMatrix();
+      renderer.setSize(window.innerWidth, window.innerHeight);
+    });
   </script>
 </body>
 </html>
