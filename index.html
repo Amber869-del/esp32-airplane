@@ -2,18 +2,38 @@
 <html lang="zh-TW">
 <head>
   <meta charset="UTF-8">
-  <title>波音客機 3D 即時姿態與跌倒監控</title>
+  <title>波音客機姿態與跌倒防護即時監控</title>
   <style>
-    body { margin: 0; overflow: hidden; background-color: #0f172a; font-family: sans-serif; color: white; }
-    
-    #ui { 
-      position: absolute; top: 20px; left: 20px; z-index: 10; 
-      background: rgba(15, 23, 42, 0.85); padding: 20px; border-radius: 12px; 
-      border: 1px solid #334155; min-width: 240px; 
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      padding: 0;
+      width: 100vw;
+      height: 100vh;
+      overflow: hidden;
+      background: radial-gradient(circle at center, #1e293b 0%, #0f172a 100%);
+      font-family: system-ui, -apple-system, sans-serif;
+      color: white;
+    }
+
+    /* 左上角儀表板 */
+    #ui {
+      position: absolute;
+      top: 20px;
+      left: 20px;
+      z-index: 10;
+      background: rgba(15, 23, 42, 0.85);
+      backdrop-filter: blur(8px);
+      padding: 20px;
+      border-radius: 12px;
+      border: 1px solid #334155;
+      min-width: 240px;
+      box-shadow: 0 10px 25px rgba(0,0,0,0.5);
     }
     h2 { margin: 0 0 10px 0; font-size: 18px; color: #38bdf8; }
     p { margin: 6px 0; font-size: 15px; }
-    
+
+    /* 跌倒緊急警報橫幅 */
     #alertBanner {
       display: none;
       position: absolute;
@@ -22,7 +42,7 @@
       background: #dc2626;
       color: white;
       text-align: center;
-      font-size: 26px;
+      font-size: 24px;
       font-weight: bold;
       padding: 15px 0;
       box-shadow: 0 4px 15px rgba(220, 38, 38, 0.6);
@@ -33,17 +53,44 @@
       from { background-color: #dc2626; }
       to { background-color: #7f1d1d; }
     }
+
+    /* 飛機舞台區域 */
+    #stage {
+      width: 100%;
+      height: 100%;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      perspective: 1000px;
+    }
+
+    /* 飛機容器與 3D 姿勢轉換 */
+    #planeWrapper {
+      width: 320px;
+      height: 320px;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      /* CSS 動畫過渡，讓旋轉超級滑順不卡頓 */
+      transition: transform 0.1s linear;
+      will-change: transform;
+    }
+
+    /* 內建波音飛機圖案 (SVG Base64 高解析透明圖片) */
+    .plane-img {
+      width: 100%;
+      height: 100%;
+      object-fit: contain;
+      filter: drop-shadow(0 15px 25px rgba(0,0,0,0.6));
+    }
   </style>
-  <!-- 三維繪圖庫 Three.js 與 GLTF 模型載入器 -->
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
-  <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/loaders/GLTFLoader.js"></script>
 </head>
 <body>
 
   <div id="alertBanner">🚨 警告：偵測到長者意外跌倒！請立刻確認狀況！</div>
 
   <div id="ui">
-    <h2>✈️ 波音客機姿態與防護監控</h2>
+    <h2>✈️ 波音姿態與防護監控</h2>
     <p>姿態 (Pitch): <span id="pitchVal">0</span>°</p>
     <p>姿勢 (Roll): <span id="rollVal">0</span>°</p>
     <hr style="border-color: #334155; margin: 10px 0;">
@@ -51,57 +98,37 @@
     <p>最近撞擊 G 力: <span id="gVal">0.0</span> G</p>
   </div>
 
+  <div id="stage">
+    <div id="planeWrapper">
+      <!-- 直接內嵌向量飛機圖片，不用外部連線，保證 100% 顯示 -->
+      <img class="plane-img" src="data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 512 512'><path fill='%2338bdf8' d='M256 16L208 176L32 240L32 288L208 240L208 400L160 448L160 496L256 464L352 496L352 448L304 400L304 240L480 288L480 240L304 176Z'/><path fill='%230284c7' d='M256 16L208 176L256 240L304 176Z'/></svg>" alt="飛機模型">
+    </div>
+  </div>
+
   <script>
-    const scene = new THREE.Scene();
-    const camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
-    const renderer = new THREE.WebGLRenderer({ antialias: true });
-    renderer.setSize(window.innerWidth, window.innerHeight);
-    document.body.appendChild(renderer.domElement);
-
-    // 環境光與平行光源
-    const ambientLight = new THREE.AmbientLight(0xffffff, 1.2);
-    scene.add(ambientLight);
-    const dirLight = new THREE.DirectionalLight(0xffffff, 1.0);
-    dirLight.position.set(5, 10, 7);
-    scene.add(dirLight);
-
-    let boeingModel = null;
-    let targetPitch = 0;
-    let targetRoll = 0;
-
-    // 載入精細 3D 飛機模型
-    const loader = new THREE.GLTFLoader();
-    loader.load('https://raw.githubusercontent.com/mrdoob/three.js/dev/examples/models/gltf/Airplane/glTF/Airplane.gltf', (gltf) => {
-      boeingModel = gltf.scene;
-      boeingModel.scale.set(0.008, 0.008, 0.008); // 縮放適當大小
-      scene.add(boeingModel);
-    }, undefined, (error) => {
-      console.error("模型載入失敗：", error);
-    });
-
-    camera.position.set(0, 2.5, 5);
-    camera.lookAt(0, 0, 0);
-
+    const planeWrapper = document.getElementById('planeWrapper');
     const planeUrl = "https://esp32-plane-f7328-default-rtdb.firebaseio.com/plane.json";
     const fallUrl  = "https://esp32-plane-f7328-default-rtdb.firebaseio.com/fall_alert.json";
 
-    // 讀取姿態 (目標角度)
+    // 讀取 3D 姿態角度並即時旋轉圖片
     async function fetchPlane() {
       try {
         const res = await fetch(planeUrl);
         const data = await res.json();
         if (data) {
-          document.getElementById('pitchVal').innerText = data.pitch;
-          document.getElementById('rollVal').innerText = data.roll;
+          const pitch = parseFloat(data.pitch) || 0;
+          const roll  = parseFloat(data.roll) || 0;
 
-          // 更新目標角度 (單位: 弧度)
-          targetPitch = data.pitch * (Math.PI / 180);
-          targetRoll = -data.roll * (Math.PI / 180);
+          document.getElementById('pitchVal').innerText = pitch.toFixed(1);
+          document.getElementById('rollVal').innerText = roll.toFixed(1);
+
+          // 套用 3D CSS 旋轉：X軸控制俯仰 (Pitch)，Z軸控制滾轉 (Roll)
+          planeWrapper.style.transform = `rotateZ(${-roll}deg) rotateX(${pitch}deg)`;
         }
       } catch (err) { console.error(err); }
     }
 
-    // 讀取跌倒警報
+    // 獨立讀取跌倒警報
     async function fetchFallAlert() {
       try {
         const res = await fetch(fallUrl);
@@ -126,29 +153,9 @@
       } catch (err) { console.error(err); }
     }
 
-    // 將查詢頻率調整為 80ms~150ms 避免卡頓
+    // 設定定時發送與監控 (80ms 發送一次，畫面順暢不卡頓)
     setInterval(fetchPlane, 80);
     setInterval(fetchFallAlert, 150);
-
-    // 60FPS 動畫渲染迴圈：採用 Lerp 平滑插值
-    function animate() {
-      requestAnimationFrame(animate);
-
-      if (boeingModel) {
-        // 使用 0.15 平滑接近目標角度，解決卡頓與硬跳轉問題
-        boeingModel.rotation.x += (targetPitch - boeingModel.rotation.x) * 0.15;
-        boeingModel.rotation.z += (targetRoll - boeingModel.rotation.z) * 0.15;
-      }
-
-      renderer.render(scene, camera);
-    }
-    animate();
-
-    window.addEventListener('resize', () => {
-      camera.aspect = window.innerWidth / window.innerHeight;
-      camera.updateProjectionMatrix();
-      renderer.setSize(window.innerWidth, window.innerHeight);
-    });
   </script>
 </body>
 </html>
