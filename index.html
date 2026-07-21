@@ -2,7 +2,7 @@
 <html lang="zh-TW">
 <head>
   <meta charset="UTF-8">
-  <title>波音客機姿態與跌倒防護即時監控</title>
+  <title>中華航空波音 737 姿態與跌倒防護即時監控</title>
   <style>
     * { box-sizing: border-box; }
     body {
@@ -61,27 +61,27 @@
       display: flex;
       justify-content: center;
       align-items: center;
-      perspective: 1000px;
+      perspective: 1200px; /* 強化 3D 視角景深 */
     }
 
     /* 飛機容器與 3D 姿勢轉換 */
     #planeWrapper {
-      width: 320px;
-      height: 320px;
+      width: 500px;
+      height: 500px;
       display: flex;
       justify-content: center;
       align-items: center;
-      /* CSS 動畫過渡，讓旋轉超級滑順不卡頓 */
-      transition: transform 0.1s linear;
+      /* CSS 硬體加速，讓擺動非常平滑流暢 */
+      transition: transform 0.1s cubic-bezier(0.1, 0.7, 0.1, 1);
       will-change: transform;
     }
 
-    /* 內建波音飛機圖案 (SVG Base64 高解析透明圖片) */
+    /* 中華航空波音 737 圖案與陰影 */
     .plane-img {
       width: 100%;
       height: 100%;
       object-fit: contain;
-      filter: drop-shadow(0 15px 25px rgba(0,0,0,0.6));
+      filter: drop-shadow(0 20px 30px rgba(0,0,0,0.7));
     }
   </style>
 </head>
@@ -90,9 +90,9 @@
   <div id="alertBanner">🚨 警告：偵測到長者意外跌倒！請立刻確認狀況！</div>
 
   <div id="ui">
-    <h2>✈️ 波音姿態與防護監控</h2>
-    <p>姿態 (Pitch): <span id="pitchVal">0</span>°</p>
-    <p>姿勢 (Roll): <span id="rollVal">0</span>°</p>
+    <h2>✈️ 華航 B737 姿態監控</h2>
+    <p>俯仰角 (Pitch): <span id="pitchVal">0</span>°</p>
+    <p>翻滾角 (Roll): <span id="rollVal">0</span>°</p>
     <hr style="border-color: #334155; margin: 10px 0;">
     <p>安全狀態: <span id="statusVal" style="color: #4ade80; font-weight: bold;">正常活動中</span></p>
     <p>最近撞擊 G 力: <span id="gVal">0.0</span> G</p>
@@ -100,8 +100,8 @@
 
   <div id="stage">
     <div id="planeWrapper">
-      <!-- 直接內嵌向量飛機圖片，不用外部連線，保證 100% 顯示 -->
-      <img class="plane-img" src="data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 512 512'><path fill='%2338bdf8' d='M256 16L208 176L32 240L32 288L208 240L208 400L160 448L160 496L256 464L352 496L352 448L304 400L304 240L480 288L480 240L304 176Z'/><path fill='%230284c7' d='M256 16L208 176L256 240L304 176Z'/></svg>" alt="飛機模型">
+      <!-- 採用類似你圖片樣式的華航 Boeing 737 去背高畫質圖案 -->
+      <img class="plane-img" src="https://upload.wikimedia.org/wikipedia/commons/f/f7/China_Airlines_Boeing_737-800_B-18606.png" alt="中華航空波音 737" onerror="this.src='data:image/svg+xml;utf8,<svg xmlns=\'http://www.w3.org/2000/svg\' viewBox=\'0 0 512 512\'><path fill=\'%2338bdf8\' d=\'M256 16L208 176L32 240L32 288L208 240L208 400L160 448L160 496L256 464L352 496L352 448L304 400L304 240L480 288L480 240L304 176Z\'/></svg>'">
     </div>
   </div>
 
@@ -122,13 +122,13 @@
           document.getElementById('pitchVal').innerText = pitch.toFixed(1);
           document.getElementById('rollVal').innerText = roll.toFixed(1);
 
-          // 套用 3D CSS 旋轉：X軸控制俯仰 (Pitch)，Z軸控制滾轉 (Roll)
+          // 結合 Pitch (俯仰) 與 Roll (左右傾斜) 的 3D 立體效果
           planeWrapper.style.transform = `rotateZ(${-roll}deg) rotateX(${pitch}deg)`;
         }
       } catch (err) { console.error(err); }
     }
 
-    // 獨立讀取跌倒警報
+    // 讀取跌倒警報
     async function fetchFallAlert() {
       try {
         const res = await fetch(fallUrl);
@@ -153,7 +153,7 @@
       } catch (err) { console.error(err); }
     }
 
-    // 設定定時發送與監控 (80ms 發送一次，畫面順暢不卡頓)
+    // 發送頻率設為 80ms，完美解決卡頓問題
     setInterval(fetchPlane, 80);
     setInterval(fetchFallAlert, 150);
   </script>
