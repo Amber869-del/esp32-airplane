@@ -36,14 +36,15 @@
     .status-offline { color: #f85149; font-weight: bold; }
   </style>
 
-  <!-- 引入 Three.js -->
+  <!-- 引入 Three.js (用於 3D 模型繪製) -->
   <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
-  <!-- 引入 Firebase JS SDK (v8) -->
+  <!-- 引入 Firebase JS SDK -->
   <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js"></script>
   <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-database.js"></script>
 </head>
 <body>
 
+  <!-- GUI 數據資訊面板 -->
   <div id="info-panel">
     <h2>✈ 華航 B777 姿勢監控</h2>
     <p>俯仰角 (Pitch): <span id="pitch-val">0.0</span>°</p>
@@ -52,7 +53,7 @@
   </div>
 
   <script>
-    // --- 1. Firebase Realtime Database 設定 ---
+    // --- 1. Firebase 資料庫連線設定 ---
     const firebaseConfig = {
       databaseURL: "https://esp32-plane-f7328-default-rtdb.firebaseio.com"
     };
@@ -60,30 +61,30 @@
     firebase.initializeApp(firebaseConfig);
     const db = firebase.database();
 
-    // --- 2. Three.js 3D 飛機繪製 ---
+    // --- 2. Three.js 3D 渲染與飛機模型 ---
     const scene = new THREE.Scene();
     const camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
     const renderer = new THREE.WebGLRenderer({ antialias: true });
     renderer.setSize(window.innerWidth, window.innerHeight);
     document.body.appendChild(renderer.domElement);
 
-    // 建立簡易飛機模型 (Group)
+    // 建立飛機組合模型
     const airplane = new THREE.Group();
 
-    // 機身 (圓柱體)
+    // 機身
     const bodyGeo = new THREE.CylinderGeometry(0.5, 0.5, 4, 32);
     const bodyMat = new THREE.MeshBasicMaterial({ color: 0xffffff });
     const body = new THREE.Mesh(bodyGeo, bodyMat);
     body.rotation.x = Math.PI / 2;
     airplane.add(body);
 
-    // 機翼 (長方體)
+    // 機翼
     const wingGeo = new THREE.BoxGeometry(6, 0.1, 1);
     const wingMat = new THREE.MeshBasicMaterial({ color: 0xffffff });
     const wing = new THREE.Mesh(wingGeo, wingMat);
     airplane.add(wing);
 
-    // 尾翼 (長方體)
+    // 尾翼
     const tailGeo = new THREE.BoxGeometry(0.1, 1.2, 0.8);
     const tailMat = new THREE.MeshBasicMaterial({ color: 0xff69b4 });
     const tail = new THREE.Mesh(tailGeo, tailMat);
@@ -94,7 +95,7 @@
     camera.position.set(0, 2, 5);
     camera.lookAt(0, 0, 0);
 
-    // --- 3. 實時資料更新與離線檢測 ---
+    // --- 3. 數據同步與 GUI 狀態更新 ---
     let lastUpdate = 0;
     const pitchEl = document.getElementById('pitch-val');
     const rollEl = document.getElementById('roll-val');
@@ -106,22 +107,22 @@
         const pitch = data.pitch || 0;
         const roll = data.roll || 0;
 
-        // 更新 UI 數據顯示
+        // 更新文字面板
         pitchEl.innerText = pitch.toFixed(1);
         rollEl.innerText = roll.toFixed(1);
 
-        // 轉換為弧度並更新 3D 飛機角度
+        // 更新 3D 模型姿勢 (角度轉弧度)
         airplane.rotation.x = THREE.MathUtils.degToRad(pitch);
         airplane.rotation.z = THREE.MathUtils.degToRad(-roll);
 
-        // 更新狀態為正常
+        // 轉換為連線狀態
         statusEl.innerText = "正常連線中";
         statusEl.className = "status-online";
         lastUpdate = Date.now();
       }
     });
 
-    // 每 3 秒檢查一次是否超時未收到資料 (離線判定)
+    // 離線判定 (3 秒未收到數據則判定離線)
     setInterval(() => {
       if (Date.now() - lastUpdate > 3000) {
         statusEl.innerText = "設備已離線 (無電源/訊號)";
@@ -129,7 +130,7 @@
       }
     }, 1000);
 
-    // --- 4. 渲染迴圈與視窗 RWD ---
+    // --- 4. 畫面渲染與視窗自動適應 ---
     function animate() {
       requestAnimationFrame(animate);
       renderer.render(scene, camera);
