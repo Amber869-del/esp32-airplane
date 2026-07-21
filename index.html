@@ -1,0 +1,94 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+  <meta charset="UTF-8">
+  <title>ESP32 即時 3D 飛機姿態同步</title>
+  <style>
+    body { margin: 0; overflow: hidden; background-color: #0f172a; font-family: sans-serif; color: white; }
+    #ui { position: absolute; top: 20px; left: 20px; z-index: 10; background: rgba(15, 23, 42, 0.85); padding: 15px 20px; border-radius: 12px; border: 1px solid #334155; }
+    h2 { margin: 0 0 10px 0; font-size: 18px; color: #38bdf8; }
+    p { margin: 5px 0; font-size: 14px; }
+  </style>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+</head>
+<body>
+  <div id="ui">
+    <h2>✈️ 即時飛機姿態監控</h2>
+    <p>Pitch (俯仰角): <span id="pitchVal">0</span>°</p>
+    <p>Roll (滾轉角): <span id="rollVal">0</span>°</p>
+  </div>
+
+  <script>
+    const scene = new THREE.Scene();
+    const camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
+    const renderer = new THREE.WebGLRenderer({ antialias: true });
+    renderer.setSize(window.innerWidth, window.innerHeight);
+    document.body.appendChild(renderer.domElement);
+
+    const ambientLight = new THREE.AmbientLight(0xffffff, 0.6);
+    scene.add(ambientLight);
+    const dirLight = new THREE.DirectionalLight(0xffffff, 0.8);
+    dirLight.position.set(5, 10, 7);
+    scene.add(dirLight);
+
+    const airplane = new THREE.Group();
+
+    // 機身
+    const fuselageGeo = new THREE.ConeGeometry(0.5, 4, 16);
+    fuselageGeo.rotateX(Math.PI / 2);
+    const fuselageMat = new THREE.MeshStandardMaterial({ color: 0x38bdf8 });
+    const fuselage = new THREE.Mesh(fuselageGeo, fuselageMat);
+    airplane.add(fuselage);
+
+    // 主機翼
+    const wingGeo = new THREE.BoxGeometry(5, 0.05, 0.8);
+    const wingMat = new THREE.MeshStandardMaterial({ color: 0x0284c7 });
+    const wing = new THREE.Mesh(wingGeo, wingMat);
+    wing.position.set(0, 0, 0.2);
+    airplane.add(wing);
+
+    // 尾翼
+    const tailGeo = new THREE.BoxGeometry(0.05, 0.8, 0.5);
+    const tail = new THREE.Mesh(tailGeo, wingMat);
+    tail.position.set(0, 0.5, -1.5);
+    airplane.add(tail);
+
+    scene.add(airplane);
+    camera.position.set(0, 3, 5);
+    camera.lookAt(0, 0, 0);
+
+    // 🎯 這裡已經填入你的專屬網址！
+    const dbUrl = "https://esp32-plane-f7328-default-rtdb.firebaseio.com/plane.json";
+
+    async function fetchPose() {
+      try {
+        const res = await fetch(dbUrl);
+        const data = await res.json();
+        if (data) {
+          document.getElementById('pitchVal').innerText = data.pitch;
+          document.getElementById('rollVal').innerText = data.roll;
+
+          airplane.rotation.x = data.pitch * (Math.PI / 180);
+          airplane.rotation.z = -data.roll * (Math.PI / 180);
+        }
+      } catch (err) {
+        console.error(err);
+      }
+    }
+
+    setInterval(fetchPose, 50);
+
+    function animate() {
+      requestAnimationFrame(animate);
+      renderer.render(scene, camera);
+    }
+    animate();
+
+    window.addEventListener('resize', () => {
+      camera.aspect = window.innerWidth / window.innerHeight;
+      camera.updateProjectionMatrix();
+      renderer.setSize(window.innerWidth, window.innerHeight);
+    });
+  </script>
+</body>
+</html>
